@@ -21,4 +21,11 @@ describe('NotFoundComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  describe('Basic Jest Test', () => {
+    it('should add numbers correctly', () => {
+      const sum = 1 + 2;
+      expect(sum).toBe(3);
+    });
+  });
 });

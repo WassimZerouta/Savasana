@@ -5,4 +5,5 @@
 
  export default (on, config) => {
    return registerCodeCoverageTasks(on, config);
+   
  };

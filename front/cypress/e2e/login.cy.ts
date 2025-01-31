@@ -1,13 +1,13 @@
-describe('Login spec', () => {
-  it('Login successfull', () => {
+describe('Login', () => {
+  it('should login user', () => {
     cy.visit('/login')
 
     cy.intercept('POST', '/api/auth/login', {
       body: {
         id: 1,
-        username: 'userName',
-        firstName: 'firstName',
-        lastName: 'lastName',
+        username: 'yogaStudio',
+        firstName: 'yoga',
+        lastName: 'studio',
         admin: true
       },
     })
