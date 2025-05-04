@@ -1,4 +1,4 @@
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -8,10 +8,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { Router } from '@angular/router';
-import { ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
-import { of } from 'rxjs';
 import { expect } from '@jest/globals';
 
 import { FormComponent } from './form.component';
@@ -19,38 +17,11 @@ import { SessionService } from 'src/app/services/session.service';
 import { SessionApiService } from '../../services/session-api.service';
 import { TeacherService } from '../../../../services/teacher.service';
 
-describe('FormComponent', () => {
+describe('FormComponent (integration)', () => {
   let component: FormComponent;
   let fixture: ComponentFixture<FormComponent>;
-
-  const mockSessionService = {
-    sessionInformation: {
-      admin: true,
-    },
-  };
-
-  const mockSessionApiService = {
-    detail: jest.fn().mockReturnValue(
-      of({
-        id: 1,
-        name: 'Session1',
-        date: '2025-01-01',
-        teacher_id: 2,
-        description: 'Session1 description',
-      })
-    ),
-    create: jest.fn().mockReturnValue(of({})),
-    update: jest.fn().mockReturnValue(of({})),
-  };
-
-  const mockTeacherService = {
-    all: jest.fn().mockReturnValue(
-      of([
-        { id: 1, firstName: 'Margot', lastName: 'Delahaye' },
-        { id: 2, firstName: 'Thiercelin', lastName: 'Hélène' },
-      ])
-    ),
-  };
+  let httpMock: HttpTestingController;
+  let sessionService: SessionService;
 
   const mockRouter = {
     navigate: jest.fn(),
@@ -72,8 +43,8 @@ describe('FormComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [
+        HttpClientTestingModule,
         RouterTestingModule,
-        HttpClientModule,
         MatCardModule,
         MatIconModule,
         MatFormFieldModule,
@@ -83,27 +54,44 @@ describe('FormComponent', () => {
         MatSelectModule,
         BrowserAnimationsModule,
       ],
+      declarations: [FormComponent],
       providers: [
-        { provide: SessionService, useValue: mockSessionService },
-        { provide: SessionApiService, useValue: mockSessionApiService },
-        { provide: TeacherService, useValue: mockTeacherService },
+        SessionService,
+        SessionApiService,
+        TeacherService,
         { provide: Router, useValue: mockRouter },
         { provide: MatSnackBar, useValue: mockMatSnackBar },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
-      declarations: [FormComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FormComponent);
     component = fixture.componentInstance;
+    sessionService = TestBed.inject(SessionService);
+    httpMock = TestBed.inject(HttpTestingController);
+
+    sessionService.logIn({
+      id: 1,
+      username: 'testUser',
+      firstName: 'Wassim',
+      lastName: 'Zerouta',
+      token: 'abc',
+      type: 'Bearer',
+      admin: true,
+    });
+
     fixture.detectChanges();
   });
 
   it('should create the component', () => {
+    const teacherReq = httpMock.expectOne('api/teacher');
+    teacherReq.flush([]);
     expect(component).toBeTruthy();
   });
 
   it('should initialize the form for creation', () => {
+    const teacherReq = httpMock.expectOne('api/teacher');
+    teacherReq.flush([]);
     expect(component.onUpdate).toBe(false);
     expect(component.sessionForm?.value).toEqual({
       name: '',
@@ -117,8 +105,22 @@ describe('FormComponent', () => {
     mockRouter.url = '/sessions/update/1';
     component.ngOnInit();
 
+    const teacherReq = httpMock.expectOne('api/teacher');
+    teacherReq.flush([
+      { id: 1, firstName: 'Margot', lastName: 'Delahaye' },
+      { id: 2, firstName: 'Thiercelin', lastName: 'Hélène' },
+    ]);
+
+    const detailReq = httpMock.expectOne('api/session/1');
+    detailReq.flush({
+      id: 1,
+      name: 'Session1',
+      date: '2025-01-01',
+      teacher_id: 2,
+      description: 'Session1 description',
+    });
+
     expect(component.onUpdate).toBe(true);
-    expect(mockSessionApiService.detail).toHaveBeenCalledWith('1');
     expect(component.sessionForm?.value).toEqual({
       name: 'Session1',
       date: '2025-01-01',
@@ -127,49 +129,98 @@ describe('FormComponent', () => {
     });
   });
 
-  it('should submit the form for creation', () => {
+  it('should submit the form for creation', (done) => {
     component.onUpdate = false;
-    component.sessionForm?.setValue({
-      name: 'New Session',
-      date: '2025-01-01',
-      teacher_id: 1,
-      description: 'New session description',
+    component.initForm();
+  
+    component.teachers$.subscribe();
+  
+    const teacherReq = httpMock.expectOne('api/teacher');
+    teacherReq.flush([
+      { id: 1, firstName: 'Margot', lastName: 'Delahaye' }
+    ]);
+  
+    fixture.whenStable().then(() => {
+      fixture.detectChanges();
+  
+      component.sessionForm?.setValue({
+        name: 'New Session',
+        date: '2025-01-01',
+        teacher_id: 1,
+        description: 'New session description',
+      });
+  
+      component.submit();
+  
+      const createReq = httpMock.expectOne('api/session');
+      expect(createReq.request.method).toBe('POST');
+      expect(createReq.request.body).toEqual({
+        name: 'New Session',
+        date: '2025-01-01',
+        teacher_id: 1,
+        description: 'New session description',
+      });
+      createReq.flush({});
+  
+      expect(mockMatSnackBar.open).toHaveBeenCalledWith('Session created !', 'Close', {
+        duration: 3000,
+      });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['sessions']);
+  
+      done();
     });
-
-    component.submit();
-
-    expect(mockSessionApiService.create).toHaveBeenCalledWith({
-      name: 'New Session',
-      date: '2025-01-01',
-      teacher_id: 1,
-      description: 'New session description',
-    });
-    expect(mockMatSnackBar.open).toHaveBeenCalledWith('Session created !', 'Close', {
-      duration: 3000,
-    });
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['sessions']);
   });
 
-  it('should submit the form for update', () => {
-    component.onUpdate = true;
-    component.sessionForm?.setValue({
-      name: 'Updated Session',
-      date: '2025-01-02',
+  it('should submit the form for update', (done) => {
+    mockRouter.url = '/sessions/update/1';
+    component.ngOnInit();
+  
+    component.teachers$.subscribe();
+  
+    const teacherReq = httpMock.expectOne('api/teacher');
+    teacherReq.flush([
+      { id: 2, firstName: 'Thiercelin', lastName: 'Hélène' }
+    ]);
+  
+    const detailReqs = httpMock.match('api/session/1');
+    expect(detailReqs.length).toBeGreaterThan(0);
+  
+    detailReqs[0].flush({
+      id: 1,
+      name: 'Session1',
+      date: '2025-01-01',
       teacher_id: 2,
-      description: 'Updated session description',
+      description: 'Session1 description',
     });
-
-    component.submit();
-
-    expect(mockSessionApiService.update).toHaveBeenCalledWith('1', {
-      name: 'Updated Session',
-      date: '2025-01-02',
-      teacher_id: 2,
-      description: 'Updated session description',
+  
+    fixture.whenStable().then(() => {
+      fixture.detectChanges();
+  
+      component.sessionForm?.setValue({
+        name: 'Updated Session',
+        date: '2025-01-02',
+        teacher_id: 2,
+        description: 'Updated session description',
+      });
+  
+      component.submit();
+  
+      const updateReq = httpMock.expectOne('api/session/1');
+      expect(updateReq.request.method).toBe('PUT');
+      expect(updateReq.request.body).toEqual({
+        name: 'Updated Session',
+        date: '2025-01-02',
+        teacher_id: 2,
+        description: 'Updated session description',
+      });
+      updateReq.flush({});
+  
+      expect(mockMatSnackBar.open).toHaveBeenCalledWith('Session updated !', 'Close', {
+        duration: 3000,
+      });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['sessions']);
+  
+      done();
     });
-    expect(mockMatSnackBar.open).toHaveBeenCalledWith('Session updated !', 'Close', {
-      duration: 3000,
-    });
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['sessions']);
   });
 });

@@ -73,6 +73,6 @@ describe('Me', () => {
 
     cy.contains('span.link', 'Logout').click();
 
-    cy.url().should('eq', Cypress.config().baseUrl + '/');
+    cy.url().should('eq', Cypress.config().baseUrl);
   });
 });

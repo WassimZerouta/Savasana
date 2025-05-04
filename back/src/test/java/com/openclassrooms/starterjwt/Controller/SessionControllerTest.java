@@ -30,7 +30,8 @@ public class SessionControllerTest {
     private String token;
 
     @BeforeAll
-    public void setupAdmin() throws Exception {
+    public void setup() throws Exception {
+        // Authentification admin
         String loginPayload = "{" +
                 "\"email\": \"yoga@studio.com\"," +
                 "\"password\": \"test!1234\"}";
@@ -42,38 +43,38 @@ public class SessionControllerTest {
                 .andReturn();
 
         token = "Bearer " + JsonPath.read(result.getResponse().getContentAsString(), "$.token");
-    }
 
-    @BeforeAll
-public void setupUser() throws Exception {
-    String sessionPayload = "{" +
-            "    \"name\": \"Session1\"," +
-            "    \"date\": \"2025-03-10\"," +
-            "    \"teacher_id\": 1," +
-            "    \"description\": \"Session description1\"" +
-            "}";
-    mockMvc.perform(post("/api/session")
-            .header("Authorization", token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(sessionPayload))
-            .andExpect(status().isOk());
-}
-
-    @Test
-    @DisplayName("Create session and validate response")
-    public void shouldCreateSession() throws Exception {
+        // Création d'une session initiale pour les tests
         String sessionPayload = "{" +
-                "    \"name\": \"Session2\"," +
+                "    \"name\": \"Session1\"," +
                 "    \"date\": \"2025-03-10\"," +
                 "    \"teacher_id\": 1," +
-                "    \"description\": \"Session description2\"" +
+                "    \"description\": \"Session description1\"" +
                 "}";
+
+        mockMvc.perform(post("/api/session")
+                .header("Authorization", token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(sessionPayload))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Create a session")
+    public void shouldCreateSession() throws Exception {
+        String sessionPayload = "{" +
+                "    \"name\": \"Valid Session\"," +
+                "    \"date\": \"2025-04-01\"," +
+                "    \"teacher_id\": 1," +
+                "    \"description\": \"A valid test session\"" +
+                "}";
+
         mockMvc.perform(post("/api/session")
                 .header("Authorization", token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(sessionPayload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.description", equalTo("Session description2")));
+                .andExpect(jsonPath("$.name", equalTo("Valid Session")));
     }
 
     @Test
@@ -95,6 +96,7 @@ public void setupUser() throws Exception {
                 "    \"teacher_id\": 1," +
                 "    \"description\": \"Session description\"" +
                 "}";
+
         mockMvc.perform(put("/api/session/1")
                 .header("Authorization", token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -104,13 +106,13 @@ public void setupUser() throws Exception {
     }
 
     @Test
-@DisplayName("get all sessions")
-public void shouldGetAllSessions() throws Exception {
-    mockMvc.perform(get("/api/session")
-            .header("Authorization", token)
-            .contentType(MediaType.APPLICATION_JSON))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$").isArray()) 
-            .andExpect(jsonPath("$[0].name").exists()); 
-}
+    @DisplayName("get all sessions")
+    public void shouldGetAllSessions() throws Exception {
+        mockMvc.perform(get("/api/session")
+                .header("Authorization", token)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].name").exists());
+    }
 }
